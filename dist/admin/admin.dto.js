@@ -1,0 +1,46 @@
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PaginationDto = exports.ChangeRoleDto = exports.Role = void 0;
+const swagger_1 = require("@nestjs/swagger");
+const class_validator_1 = require("class-validator");
+var Role;
+(function (Role) {
+    Role["USER"] = "USER";
+    Role["AGENT"] = "AGENT";
+    Role["SUPPORT"] = "SUPPORT";
+    Role["COMPLIANCE"] = "COMPLIANCE";
+    Role["FINANCE"] = "FINANCE";
+    Role["ADMIN"] = "ADMIN";
+    Role["SUPER_ADMIN"] = "SUPER_ADMIN";
+})(Role || (exports.Role = Role = {}));
+class ChangeRoleDto {
+}
+exports.ChangeRoleDto = ChangeRoleDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ enum: Role, example: 'ADMIN', description: 'New role for the user' }),
+    (0, class_validator_1.IsEnum)(Role),
+    __metadata("design:type", String)
+], ChangeRoleDto.prototype, "role", void 0);
+class PaginationDto {
+}
+exports.PaginationDto = PaginationDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 1, description: 'Page number', default: 1, required: false }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], PaginationDto.prototype, "page", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 20, description: 'Items per page', default: 20, required: false }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], PaginationDto.prototype, "limit", void 0);
+//# sourceMappingURL=admin.dto.js.map

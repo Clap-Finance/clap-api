@@ -1,0 +1,618 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// AUTH & SESSIONS
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(uuid())
+  email        String?   @unique
+  phone        String    @unique
+  passwordHash String?
+  firstName    String?
+  lastName     String?
+  country      String?
+  dob          DateTime?
+  address      String?
+  tier         Tier      @default(TIER_0)
+  status       UserStatus @default(PENDING)
+  role         Role      @default(USER)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  wallets          Wallet[]
+  transactions     Transaction[]
+  kycDocuments     KycDocument[]
+  beneficiaries    Beneficiary[]
+  sessions         Session[]
+  devices          Device[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+  agent            Agent?
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken String   @unique
+  deviceInfo   String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  revokedAt    DateTime?
+
+  @@index([userId])
+}
+
+model Device {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId     String
+  platform     String?
+  pushToken    String?
+  biometricEnabled Boolean @default(false)
+  lastUsedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, deviceId])
+}
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  purpose   String   // login, transfer, kyc
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([phone, code])
+}
+
+// ─────────────────────────────────────────────────────────────
+// WALLETS & BALANCES
+// ─────────────────────────────────────────────────────────────
+
+model Wallet {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency         Currency
+  balance          BigInt   @default(0) // integer minor units
+  availableBalance BigInt   @default(0)
+  lockedBalance    BigInt   @default(0)
+  status           WalletStatus @default(ACTIVE)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([userId, currency])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// DOUBLE-ENTRY LEDGER
+// ─────────────────────────────────────────────────────────────
+
+model LedgerAccount {
+  id        String   @id @default(uuid())
+  code      String   @unique // e.g. WALLET_NGN, REVENUE, PROVIDER_CLEARING
+  name      String
+  type      LedgerAccountType
+  currency  Currency?
+  createdAt DateTime @default(now())
+
+  entries   LedgerEntry[]
+}
+
+model Journal {
+  id              String   @id @default(uuid())
+  reference       String   @unique
+  transactionId  String?  @unique
+  description     String
+  status          JournalStatus @default(PENDING)
+  createdAt       DateTime @default(now())
+  postedAt        DateTime?
+
+  entries         LedgerEntry[]
+  transaction     Transaction? @relation(fields: [transactionId], references: [id])
+}
+
+model LedgerEntry {
+  id          String   @id @default(uuid())
+  journalId   String
+  journal     Journal  @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     LedgerAccount @relation(fields: [accountId], references: [id])
+  debit       BigInt   @default(0)
+  credit      BigInt   @default(0)
+  currency    Currency
+  createdAt   DateTime @default(now())
+
+  @@index([journalId])
+  @@index([accountId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// TRANSACTIONS
+// ─────────────────────────────────────────────────────────────
+
+model Transaction {
+  id              String   @id @default(uuid())
+  reference       String   @unique
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  type            TransactionType
+  status          TransactionStatus @default(PENDING)
+  direction       TransactionDirection
+  amount          BigInt
+  currency        Currency
+  fee             BigInt   @default(0)
+  fromCurrency    Currency?
+  toCurrency      Currency?
+  exchangeRate    Decimal?
+  provider        String?
+  providerRef     String?
+  counterpartyName String?
+  counterpartyAccount String?
+  counterpartyBank     String?
+  counterpartyCountry  String?
+  description     String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime?
+  failedAt        DateTime?
+
+  journal         Journal?
+
+  @@index([userId])
+  @@index([status])
+  @@index([reference])
+}
+
+// ─────────────────────────────────────────────────────────────
+// FX RATES & QUOTES
+// ─────────────────────────────────────────────────────────────
+
+model ExchangeRate {
+  id           String   @id @default(uuid())
+  baseCurrency  Currency
+  quoteCurrency Currency
+  rate         Decimal
+  spread       Decimal  @default(0)
+  buyRate      Decimal
+  sellRate     Decimal
+  source       String   @default("manual")
+  expiresAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([baseCurrency, quoteCurrency])
+}
+
+model FxQuote {
+  id           String   @id @default(uuid())
+  userId       String?
+  fromCurrency Currency
+  toCurrency   Currency
+  amount       BigInt
+  rate         Decimal
+  fee          BigInt   @default(0)
+  expiresAt    DateTime
+  status        QuoteStatus @default(OPEN)
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// PAYMENT PROVIDERS & REQUESTS
+// ─────────────────────────────────────────────────────────────
+
+model PaymentProvider {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  code      String   @unique
+  isActive  Boolean  @default(true)
+  config    Json?
+  priority  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  requests   PaymentRequest[]
+  webhooks   WebhookEvent[]
+}
+
+model PaymentRequest {
+  id           String   @id @default(uuid())
+  providerId   String
+  provider     PaymentProvider @relation(fields: [providerId], references: [id])
+  transactionId String?
+  providerRef   String?
+  requestType  String   // transfer, receive, verify
+  payload      Json
+  response     Json?
+  status       String   @default("PENDING")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([providerId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// WEBHOOKS
+// ─────────────────────────────────────────────────────────────
+
+model WebhookEvent {
+  id           String   @id @default(uuid())
+  providerId   String
+  provider     PaymentProvider @relation(fields: [providerId], references: [id])
+  eventType    String
+  signature    String?
+  payload      Json
+  status       WebhookStatus @default(RECEIVED)
+  attempts     Int      @default(0)
+  processedAt  DateTime?
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([providerId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// KYC
+// ─────────────────────────────────────────────────────────────
+
+model KycDocument {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentType KycDocumentType
+  documentNumber String?
+  documentData Json?
+  storageUrl   String?
+  verified     Boolean  @default(false)
+  verifiedAt   DateTime?
+  verifiedBy   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model KycVerification {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  tier         Tier
+  status       KycStatus @default(PENDING)
+  bvn          String?
+  nin          String?
+  selfieUrl    String?
+  proofOfAddressUrl String?
+  reviewedBy   String?
+  notes        String?
+  submittedAt  DateTime @default(now())
+  reviewedAt   DateTime?
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// COMPLIANCE
+// ─────────────────────────────────────────────────────────────
+
+model ComplianceCheck {
+  id           String   @id @default(uuid())
+  userId       String?
+  transactionId String?
+  checkType    ComplianceCheckType
+  status       ComplianceStatus @default(PENDING)
+  riskScore    Int      @default(0)
+  details      Json?
+  reviewedBy   String?
+  createdAt    DateTime @default(now())
+  reviewedAt   DateTime?
+
+  @@index([userId])
+  @@index([transactionId])
+}
+
+model SanctionEntry {
+  id        String   @id @default(uuid())
+  firstName String
+  lastName  String
+  matchKey  String
+  source    String
+  createdAt DateTime @default(now())
+
+  @@index([matchKey])
+}
+
+// ─────────────────────────────────────────────────────────────
+// BENEFICIARIES & BANKS
+// ─────────────────────────────────────────────────────────────
+
+model Beneficiary {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  accountNumber String
+  bankCode     String?
+  bankName     String?
+  country      String
+  currency     Currency
+  nickname     String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Bank {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  country   String
+  currency  Currency
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────
+// AGENTS
+// ─────────────────────────────────────────────────────────────
+
+model Agent {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code         String   @unique
+  businessName String
+  location     String?
+  latitude     Decimal?
+  longitude    Decimal?
+  cashBalance  BigInt   @default(0)
+  floatBalance BigInt   @default(0)
+  commissionRate Decimal @default(0)
+  dailyLimit   BigInt   @default(0)
+  status       AgentStatus @default(ACTIVE)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  transactions AgentTransaction[]
+}
+
+model AgentTransaction {
+  id           String   @id @default(uuid())
+  agentId      String
+  agent        Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  userId       String?
+  type         AgentTxType
+  amount       BigInt
+  currency     Currency
+  commission   BigInt   @default(0)
+  status       TransactionStatus @default(PENDING)
+  createdAt    DateTime @default(now())
+  completedAt  DateTime?
+
+  @@index([agentId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel   NotificationChannel
+  template  String
+  payload   Json?
+  status    NotificationStatus @default(QUEUED)
+  sentAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// AUDIT LOGS
+// ─────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  actorId   String?
+  action    String
+  resource  String?
+  resourceId String?
+  metadata  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([actorId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// COUNTRIES
+// ─────────────────────────────────────────────────────────────
+
+model Country {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  currency  Currency
+  region    String?
+  isActive Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  USER
+  AGENT
+  SUPPORT
+  COMPLIANCE
+  FINANCE
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum Tier {
+  TIER_0
+  TIER_1
+  TIER_2
+  TIER_3
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  BANNED
+  CLOSED
+}
+
+enum WalletStatus {
+  ACTIVE
+  FROZEN
+  CLOSED
+}
+
+enum Currency {
+  NGN
+  USD
+  EUR
+  GBP
+  GHS
+  KES
+  ZAR
+  XOF
+}
+
+enum TransactionType {
+  TRANSFER
+  DEPOSIT
+  WITHDRAWAL
+  FX
+  AGENT_PAYMENT
+  INTERNAL_TRANSFER
+  INTERNATIONAL_TRANSFER
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REVERSED
+}
+
+enum TransactionDirection {
+  DEBIT
+  CREDIT
+}
+
+enum JournalStatus {
+  PENDING
+  POSTED
+  REVERSED
+}
+
+enum LedgerAccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum QuoteStatus {
+  OPEN
+  EXPIRED
+  USED
+  CANCELLED
+}
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum KycDocumentType {
+  BVN
+  NIN
+  PASSPORT
+  DRIVERS_LICENSE
+  SELFIE
+  PROOF_OF_ADDRESS
+}
+
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum ComplianceCheckType {
+  AML
+  PEP
+  SANCTIONS
+  VELOCITY
+  FRAUD
+  BLACKLIST
+}
+
+enum ComplianceStatus {
+  PENDING
+  PASSED
+  FLAGGED
+  REJECTED
+}
+
+enum AgentStatus {
+  ACTIVE
+  SUSPENDED
+  TERMINATED
+}
+
+enum AgentTxType {
+  CASH_IN
+  CASH_OUT
+  COMMISSION
+  SETTLEMENT
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  SMS
+  EMAIL
+  PUSH
+  IN_APP
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+  DELIVERED
+}

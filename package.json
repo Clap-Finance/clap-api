@@ -1,0 +1,44 @@
+{
+  "name": "clap-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "dev": "nest start --watch",
+    "prisma:generate": "prisma generate",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@nestjs/common": "*",
+    "@nestjs/config": "*",
+    "@nestjs/core": "*",
+    "@nestjs/jwt": "*",
+    "@nestjs/passport": "*",
+    "@nestjs/platform-express": "*",
+    "@nestjs/swagger": "*",
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "*",
+    "@supabase/supabase-js": "^2.111.0",
+    "argon2": "*",
+    "class-transformer": "*",
+    "class-validator": "*",
+    "passport": "*",
+    "passport-jwt": "*",
+    "pg": "^8.22.0",
+    "reflect-metadata": "*",
+    "rxjs": "*",
+    "uuid": "*"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "*",
+    "@types/node": "*",
+    "@types/passport-jwt": "*",
+    "@types/pg": "^8.20.3",
+    "@types/uuid": "*",
+    "prisma": "*",
+    "ts-node": "*",
+    "typescript": "^6.0.3"
+  }
+}
