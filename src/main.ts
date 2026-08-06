@@ -14,6 +14,8 @@ async function bootstrap() {
 
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
 
+  app.setGlobalPrefix('api/v1');
+
   const config = new DocumentBuilder()
     .setTitle('Clap API')
     .setDescription(
@@ -70,8 +72,6 @@ async function bootstrap() {
       showExtensions: true,
     },
   });
-
-  app.setGlobalPrefix('api/v1');
 
   const port = 4000;
   await app.listen(port);
