@@ -6,21 +6,21 @@ export declare class AuthService {
     private jwtService;
     constructor(prisma: PrismaService, jwtService: JwtService);
     register(dto: RegisterDto): Promise<{
-        userId: any;
+        userId: string;
         requiresOtp: boolean;
         accessToken: string;
         refreshToken: `${string}-${string}-${string}-${string}-${string}`;
         expiresIn: number;
     }>;
     login(dto: LoginDto): Promise<{
-        userId: any;
+        userId: string;
         requiresOtp: boolean;
         accessToken: string;
         refreshToken: `${string}-${string}-${string}-${string}-${string}`;
         expiresIn: number;
     }>;
     verifyOtp(dto: VerifyOtpDto): Promise<{
-        userId: any;
+        userId: string;
         requiresOtp: boolean;
         accessToken: string;
         refreshToken: `${string}-${string}-${string}-${string}-${string}`;
@@ -34,7 +34,21 @@ export declare class AuthService {
     logout(refreshToken: string): Promise<{
         success: boolean;
     }>;
-    getMe(userId: string): Promise<any>;
+    getMe(userId: string): Promise<{
+        country: string | null;
+        phone: string;
+        email: string | null;
+        firstName: string | null;
+        lastName: string | null;
+        id: string;
+        dob: Date | null;
+        address: string | null;
+        tier: import("@prisma/client").$Enums.Tier;
+        status: import("@prisma/client").$Enums.UserStatus;
+        role: import("@prisma/client").$Enums.Role;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
     private issueTokens;
     private generateOtp;
 }

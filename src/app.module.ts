@@ -19,13 +19,11 @@ import { BanksModule } from './banks/banks.module';
 import { CountriesModule } from './countries/countries.module';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { SupabaseModule } from './supabase/supabase.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
-    SupabaseModule,
     AuthModule,
     UsersModule,
     WalletsModule,

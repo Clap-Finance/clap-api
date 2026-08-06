@@ -28,7 +28,6 @@ const banks_module_1 = require("./banks/banks.module");
 const countries_module_1 = require("./countries/countries.module");
 const health_module_1 = require("./health/health.module");
 const prisma_module_1 = require("./prisma/prisma.module");
-const supabase_module_1 = require("./supabase/supabase.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -37,7 +36,6 @@ exports.AppModule = AppModule = __decorate([
         imports: [
             config_1.ConfigModule.forRoot({ isGlobal: true }),
             prisma_module_1.PrismaModule,
-            supabase_module_1.SupabaseModule,
             auth_module_1.AuthModule,
             users_module_1.UsersModule,
             wallets_module_1.WalletsModule,

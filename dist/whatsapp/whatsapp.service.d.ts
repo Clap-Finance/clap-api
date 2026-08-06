@@ -7,17 +7,24 @@ export declare class WhatsappService {
         received: boolean;
         from: string;
         messageId: string;
-        userId: any;
+        userId: string;
     }>;
     sendMessage(dto: SendWhatsappMessageDto): Promise<{
         sent: boolean;
         to: string;
         message: string;
-        userId: any;
+        userId: string;
     }>;
     getConversation(phone: string): Promise<{
         phone: string;
-        userId: any;
-        messages: any;
+        userId: string;
+        messages: {
+            id: string;
+            template: string;
+            payload: import("@prisma/client/runtime/client").JsonValue;
+            status: import("@prisma/client").$Enums.NotificationStatus;
+            sentAt: Date;
+            createdAt: Date;
+        }[];
     }>;
 }

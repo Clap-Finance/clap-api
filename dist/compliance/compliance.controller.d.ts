@@ -4,20 +4,63 @@ export declare class ComplianceController {
     private readonly complianceService;
     constructor(complianceService: ComplianceService);
     findChecks(query: PaginationDto): Promise<{
-        data: any;
+        data: {
+            userId: string | null;
+            id: string;
+            status: import("@prisma/client").$Enums.ComplianceStatus;
+            createdAt: Date;
+            transactionId: string | null;
+            reviewedBy: string | null;
+            reviewedAt: Date | null;
+            checkType: import("@prisma/client").$Enums.ComplianceCheckType;
+            riskScore: number;
+            details: import("@prisma/client/runtime/client").JsonValue | null;
+        }[];
         meta: {
             page: number;
             limit: number;
-            total: any;
+            total: number;
             totalPages: number;
         };
     }>;
-    createCheck(dto: CreateComplianceCheckDto): Promise<any>;
+    createCheck(dto: CreateComplianceCheckDto): Promise<{
+        userId: string | null;
+        id: string;
+        status: import("@prisma/client").$Enums.ComplianceStatus;
+        createdAt: Date;
+        transactionId: string | null;
+        reviewedBy: string | null;
+        reviewedAt: Date | null;
+        checkType: import("@prisma/client").$Enums.ComplianceCheckType;
+        riskScore: number;
+        details: import("@prisma/client/runtime/client").JsonValue | null;
+    }>;
     screenName(dto: ScreenNameDto): Promise<{
         screenedName: string;
-        exactMatches: any;
-        partialMatches: any;
+        exactMatches: {
+            firstName: string;
+            lastName: string;
+            id: string;
+            createdAt: Date;
+            source: string;
+            matchKey: string;
+        }[];
+        partialMatches: {
+            firstName: string;
+            lastName: string;
+            id: string;
+            createdAt: Date;
+            source: string;
+            matchKey: string;
+        }[];
         isFlagged: boolean;
     }>;
-    findSanctions(): Promise<any>;
+    findSanctions(): Promise<{
+        firstName: string;
+        lastName: string;
+        id: string;
+        createdAt: Date;
+        source: string;
+        matchKey: string;
+    }[]>;
 }

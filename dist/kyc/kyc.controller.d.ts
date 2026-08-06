@@ -3,22 +3,111 @@ import { UploadKycDocumentDto, SubmitKycVerificationDto, RejectKycDto, Paginatio
 export declare class KycController {
     private readonly kycService;
     constructor(kycService: KycService);
-    uploadDocument(req: any, dto: UploadKycDocumentDto): Promise<any>;
-    findMyDocuments(req: any): Promise<any>;
-    submitVerification(req: any, dto: SubmitKycVerificationDto): Promise<any>;
+    uploadDocument(req: any, dto: UploadKycDocumentDto): Promise<{
+        userId: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        documentType: import("@prisma/client").$Enums.KycDocumentType;
+        documentNumber: string | null;
+        storageUrl: string | null;
+        documentData: import("@prisma/client/runtime/client").JsonValue | null;
+        verified: boolean;
+        verifiedAt: Date | null;
+        verifiedBy: string | null;
+    }>;
+    findMyDocuments(req: any): Promise<{
+        userId: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        documentType: import("@prisma/client").$Enums.KycDocumentType;
+        documentNumber: string | null;
+        storageUrl: string | null;
+        documentData: import("@prisma/client/runtime/client").JsonValue | null;
+        verified: boolean;
+        verifiedAt: Date | null;
+        verifiedBy: string | null;
+    }[]>;
+    submitVerification(req: any, dto: SubmitKycVerificationDto): Promise<{
+        userId: string;
+        id: string;
+        tier: import("@prisma/client").$Enums.Tier;
+        status: import("@prisma/client").$Enums.KycStatus;
+        bvn: string | null;
+        nin: string | null;
+        selfieUrl: string | null;
+        proofOfAddressUrl: string | null;
+        reviewedBy: string | null;
+        notes: string | null;
+        submittedAt: Date;
+        reviewedAt: Date | null;
+    }>;
     getStatus(req: any): Promise<{
-        tier: any;
-        verification: any;
+        tier: import("@prisma/client").$Enums.Tier;
+        verification: {
+            userId: string;
+            id: string;
+            tier: import("@prisma/client").$Enums.Tier;
+            status: import("@prisma/client").$Enums.KycStatus;
+            bvn: string | null;
+            nin: string | null;
+            selfieUrl: string | null;
+            proofOfAddressUrl: string | null;
+            reviewedBy: string | null;
+            notes: string | null;
+            submittedAt: Date;
+            reviewedAt: Date | null;
+        };
     }>;
     findAllVerifications(query: PaginationDto): Promise<{
-        data: any;
+        data: {
+            userId: string;
+            id: string;
+            tier: import("@prisma/client").$Enums.Tier;
+            status: import("@prisma/client").$Enums.KycStatus;
+            bvn: string | null;
+            nin: string | null;
+            selfieUrl: string | null;
+            proofOfAddressUrl: string | null;
+            reviewedBy: string | null;
+            notes: string | null;
+            submittedAt: Date;
+            reviewedAt: Date | null;
+        }[];
         meta: {
             page: number;
             limit: number;
-            total: any;
+            total: number;
             totalPages: number;
         };
     }>;
-    approve(req: any, id: string): Promise<any>;
-    reject(req: any, id: string, dto: RejectKycDto): Promise<any>;
+    approve(req: any, id: string): Promise<{
+        userId: string;
+        id: string;
+        tier: import("@prisma/client").$Enums.Tier;
+        status: import("@prisma/client").$Enums.KycStatus;
+        bvn: string | null;
+        nin: string | null;
+        selfieUrl: string | null;
+        proofOfAddressUrl: string | null;
+        reviewedBy: string | null;
+        notes: string | null;
+        submittedAt: Date;
+        reviewedAt: Date | null;
+    }>;
+    reject(req: any, id: string, dto: RejectKycDto): Promise<{
+        userId: string;
+        id: string;
+        tier: import("@prisma/client").$Enums.Tier;
+        status: import("@prisma/client").$Enums.KycStatus;
+        bvn: string | null;
+        nin: string | null;
+        selfieUrl: string | null;
+        proofOfAddressUrl: string | null;
+        reviewedBy: string | null;
+        notes: string | null;
+        submittedAt: Date;
+        reviewedAt: Date | null;
+    }>;
 }
