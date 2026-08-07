@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { WhatsappService } from './whatsapp.service';
 import { WhatsappWebhookDto, SendWhatsappMessageDto, WhatsappWebhookVerificationDto } from './whatsapp.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { FLOWS } from './whatsapp.flows';
 
 @ApiTags('WhatsApp')
 @Controller('whatsapp')
@@ -27,6 +28,31 @@ export class WhatsappController {
   @ApiResponse({ status: 201, description: 'Webhook received successfully' })
   receiveWebhook(@Body() dto: WhatsappWebhookDto) {
     return this.whatsappService.receiveWebhook(dto);
+  }
+
+  @Get('flows/:flowName/config')
+  @ApiOperation({ summary: 'Flow config (public)', description: 'Serves the WhatsApp Flow JSON definition that Meta renders for the given flow.' })
+  @ApiResponse({ status: 200, description: 'Flow JSON' })
+  getFlowConfig(@Param('flowName') flowName: string) {
+    const flow = FLOWS[flowName];
+    if (!flow) throw new NotFoundException('Flow not found');
+    return flow;
+  }
+
+  @Post('flows/:flowName/data')
+  @ApiOperation({ summary: 'Flow data (public)', description: 'Handles dynamic data and validation requests from Meta for the given flow.' })
+  @ApiResponse({ status: 200, description: 'Resolved data' })
+  flowData(@Param('flowName') flowName: string) {
+    if (!FLOWS[flowName]) throw new NotFoundException('Flow not found');
+    return { data: {} };
+  }
+
+  @Post('flows/:flowName/flow')
+  @ApiOperation({ summary: 'Flow submission (public)', description: 'Receives the user-submitted flow data from Meta for the given flow.' })
+  @ApiResponse({ status: 200, description: 'Submission processed' })
+  flowSubmission(@Param('flowName') flowName: string, @Body() body: Record<string, unknown>) {
+    if (!FLOWS[flowName]) throw new NotFoundException('Flow not found');
+    return this.whatsappService.handleFlowSubmission(flowName, body);
   }
 
   @Post('send')

@@ -425,6 +425,16 @@ model Notification {
   @@index([userId])
 }
 
+model WhatsappFlowSession {
+  id        String   @id @default(uuid())
+  flowToken String   @unique
+  waId      String
+  flowName  String
+  createdAt DateTime @default(now())
+
+  @@index([waId])
+}
+
 // ─────────────────────────────────────────────────────────────
 // AUDIT LOGS
 // ─────────────────────────────────────────────────────────────
