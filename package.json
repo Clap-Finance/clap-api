@@ -3,13 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-<<<<<<< HEAD
-    "build": "tsc -p tsconfig.json",
+"build": "prisma generate && tsc -p tsconfig.json",
     "start": "prisma migrate deploy && node dist/main.js",
-=======
-    "build": "prisma generate && tsc -p tsconfig.json",
-    "start": "nest start",
->>>>>>> e9b615890d4863a0696ac2fdaf2fe7d6407bdb6f
     "start:dev": "nest start --watch",
     "dev": "nest start --watch",
     "test": "jest",
