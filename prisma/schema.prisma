@@ -27,7 +27,6 @@ model User {
   updatedAt    DateTime  @updatedAt
 
   wallets          Wallet[]
-  virtualAccounts  VirtualAccount[]
   transactions     Transaction[]
   kycDocuments     KycDocument[]
   beneficiaries    Beneficiary[]
