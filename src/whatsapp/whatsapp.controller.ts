@@ -1,10 +1,16 @@
-import { Body, Controller, Get, NotFoundException, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
-import { Response } from 'express';
+import { Body, Controller, Get, NotFoundException, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { WhatsappService } from './whatsapp.service';
 import { WhatsappWebhookDto, SendWhatsappMessageDto, WhatsappWebhookVerificationDto } from './whatsapp.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FLOWS } from './whatsapp.flows';
+
+interface RawBodyRequest extends Request {
+  rawBody?: Buffer;
+}
+
+const rawBodyOf = (req: RawBodyRequest, body: Record<string, unknown>): Buffer => req.rawBody ?? Buffer.from(JSON.stringify(body));
 
 @ApiTags('WhatsApp')
 @Controller('whatsapp')
@@ -40,19 +46,47 @@ export class WhatsappController {
   }
 
   @Post('flows/:flowName/data')
-  @ApiOperation({ summary: 'Flow data (public)', description: 'Handles dynamic data and validation requests from Meta for the given flow.' })
-  @ApiResponse({ status: 200, description: 'Resolved data' })
-  flowData(@Param('flowName') flowName: string) {
+  @ApiOperation({ summary: 'Flow data (public)', description: 'Handles encrypted data exchange, health check and error notification requests from Meta for the given flow. Body is RSA-OAEP/AES-GCM encrypted and the response is encrypted with the request AES key.' })
+  @ApiResponse({ status: 200, description: 'Encrypted flow response (text/plain)' })
+  @ApiResponse({ status: 401, description: 'Invalid X-Hub-Signature-256' })
+  @ApiResponse({ status: 421, description: 'Unable to decrypt payload' })
+  @ApiResponse({ status: 404, description: 'Flow not found' })
+  async flowData(
+    @Param('flowName') flowName: string,
+    @Req() req: RawBodyRequest,
+    @Body() body: Record<string, unknown>,
+    @Res() res: Response,
+  ) {
     if (!FLOWS[flowName]) throw new NotFoundException('Flow not found');
-    return { data: {} };
+    const result = await this.whatsappService.handleFlowEndpointRequest(
+      flowName,
+      rawBodyOf(req, body),
+      body,
+      req.headers['x-hub-signature-256'] as string | undefined,
+    );
+    return res.status(result.httpStatus).set({ 'Content-Type': result.contentType }).send(result.body);
   }
 
   @Post('flows/:flowName/flow')
-  @ApiOperation({ summary: 'Flow submission (public)', description: 'Receives the user-submitted flow data from Meta for the given flow.' })
-  @ApiResponse({ status: 200, description: 'Submission processed' })
-  flowSubmission(@Param('flowName') flowName: string, @Body() body: Record<string, unknown>) {
+  @ApiOperation({ summary: 'Flow submission (public)', description: 'Handles encrypted flow data exchange requests from Meta for the given flow, including terminal submissions. Body is RSA-OAEP/AES-GCM encrypted and the response is encrypted with the request AES key.' })
+  @ApiResponse({ status: 200, description: 'Encrypted flow response (text/plain)' })
+  @ApiResponse({ status: 401, description: 'Invalid X-Hub-Signature-256' })
+  @ApiResponse({ status: 421, description: 'Unable to decrypt payload' })
+  @ApiResponse({ status: 404, description: 'Flow not found' })
+  async flowSubmission(
+    @Param('flowName') flowName: string,
+    @Req() req: RawBodyRequest,
+    @Body() body: Record<string, unknown>,
+    @Res() res: Response,
+  ) {
     if (!FLOWS[flowName]) throw new NotFoundException('Flow not found');
-    return this.whatsappService.handleFlowSubmission(flowName, body);
+    const result = await this.whatsappService.handleFlowEndpointRequest(
+      flowName,
+      rawBodyOf(req, body),
+      body,
+      req.headers['x-hub-signature-256'] as string | undefined,
+    );
+    return res.status(result.httpStatus).set({ 'Content-Type': result.contentType }).send(result.body);
   }
 
   @Post('send')

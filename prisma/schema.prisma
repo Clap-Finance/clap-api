@@ -27,6 +27,7 @@ model User {
   updatedAt    DateTime  @updatedAt
 
   wallets          Wallet[]
+  virtualAccounts  VirtualAccount[]
   transactions     Transaction[]
   kycDocuments     KycDocument[]
   beneficiaries    Beneficiary[]
@@ -430,9 +431,42 @@ model WhatsappFlowSession {
   flowToken String   @unique
   waId      String
   flowName  String
+  data      Json?
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([waId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// PREMIUM TRUST BANK VIRTUAL ACCOUNTS
+// ─────────────────────────────────────────────────────────────
+
+model VirtualAccount {
+  id          String               @id @default(uuid())
+  userId      String
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountNo   String               @unique
+  accountType VirtualAccountType   @default(STATIC)
+  bankName    String?
+  currency    Currency             @default(NGN)
+  status      VirtualAccountStatus @default(ACTIVE)
+  bvn         String?
+  metadata    Json?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([userId])
+}
+
+enum VirtualAccountType {
+  STATIC
+  DYNAMIC
+}
+
+enum VirtualAccountStatus {
+  ACTIVE
+  CLOSED
 }
 
 // ─────────────────────────────────────────────────────────────
