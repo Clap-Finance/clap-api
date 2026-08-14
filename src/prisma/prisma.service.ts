@@ -11,7 +11,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
       process.env.DATABASE_URL ||
       process.env.SUPABASE_DB_URL ||
       process.env.POSTGRES_URL ||
-      'postgresql://postgres:postgres@localhost:5432/postgres';
+      'postgresql://postgres:lyhweJEODGPfBNxdLNMinxdUIcTUabxo@postgres.railway.internal:5432/railway';
 
     const adapter = new PrismaPg({ connectionString });
     super({ adapter });

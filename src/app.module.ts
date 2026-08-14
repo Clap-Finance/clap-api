@@ -19,7 +19,6 @@ import { BanksModule } from './banks/banks.module';
 import { CountriesModule } from './countries/countries.module';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { PremiumTrustModule } from './premiumtrust/premiumtrust.module';
 
 @Module({
   imports: [
@@ -43,7 +42,6 @@ import { PremiumTrustModule } from './premiumtrust/premiumtrust.module';
     BanksModule,
     CountriesModule,
     HealthModule,
-    PremiumTrustModule,
   ],
 })
 export class AppModule {}

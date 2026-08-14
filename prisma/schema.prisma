@@ -439,37 +439,6 @@ model WhatsappFlowSession {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PREMIUM TRUST BANK VIRTUAL ACCOUNTS
-// ─────────────────────────────────────────────────────────────
-
-model VirtualAccount {
-  id          String               @id @default(uuid())
-  userId      String
-  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accountNo   String               @unique
-  accountType VirtualAccountType   @default(STATIC)
-  bankName    String?
-  currency    Currency             @default(NGN)
-  status      VirtualAccountStatus @default(ACTIVE)
-  bvn         String?
-  metadata    Json?
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
-
-  @@index([userId])
-}
-
-enum VirtualAccountType {
-  STATIC
-  DYNAMIC
-}
-
-enum VirtualAccountStatus {
-  ACTIVE
-  CLOSED
-}
-
-// ─────────────────────────────────────────────────────────────
 // AUDIT LOGS
 // ─────────────────────────────────────────────────────────────
 
