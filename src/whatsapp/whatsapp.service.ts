@@ -1,16 +1,214 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuthService } from '../auth/auth.service';
 import { WhatsappWebhookDto, SendWhatsappMessageDto } from './whatsapp.dto';
-import { welcomeTemplate, WELCOME_BUTTON } from './whatsapp.templates';
+import { welcomeTemplate, flowAction } from './whatsapp.templates';
+import { decryptFlowRequest, encryptFlowResponse, FlowCryptoError, verifyHubSignature } from './whatsapp.crypto';
+
+export interface FlowEndpointResponse {
+  httpStatus: number;
+  contentType: string;
+  body: string;
+}
+
+interface FlowRequest {
+  version?: string;
+  action?: string;
+  screen?: string;
+  flow_token?: string;
+  data?: Record<string, any>;
+}
+
+const ROUTING_MODEL: Record<string, string> = {
+  PERSONAL_DETAILS: 'YOUR_ADDRESS',
+  YOUR_ADDRESS: 'SET_TRANSACTION_PIN',
+};
 
 @Injectable()
 export class WhatsappService {
-  constructor(
-    private prisma: PrismaService,
-    private authService: AuthService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
+
+  async handleFlowEndpointRequest(
+    flowName: string,
+    rawBody: Buffer | string,
+    parsedBody: Record<string, unknown>,
+    signature?: string,
+  ): Promise<FlowEndpointResponse> {
+    const appSecret = process.env.WHATSAPP_APP_SECRET || process.env.APP_SECRET;
+
+    if (appSecret && !verifyHubSignature(rawBody, signature, appSecret)) {
+      return this.plain(401, 'Invalid X-Hub-Signature-256');
+    }
+
+    const privateKey = process.env.WHATSAPP_PRIVATE_KEY;
+    let request: FlowRequest;
+    let encrypted = false;
+    let aesKey: Buffer | undefined;
+    let initialVector: Buffer | undefined;
+
+    if (privateKey) {
+      try {
+        const decrypted = decryptFlowRequest(parsedBody, privateKey);
+        request = decrypted.decryptedBody;
+        aesKey = decrypted.aesKey;
+        initialVector = decrypted.initialVector;
+        encrypted = true;
+      } catch (err) {
+        if (err instanceof FlowCryptoError) {
+          return this.plain(421, err.message);
+        }
+        throw err;
+      }
+    } else {
+      request = parsedBody as unknown as FlowRequest;
+    }
+
+    const respond = (payload: unknown) =>
+      encrypted
+        ? this.plain(200, encryptFlowResponse(payload, aesKey!, initialVector!))
+        : { httpStatus: 200, contentType: 'application/json', body: JSON.stringify(payload) };
+
+    if (request.action === 'ping') {
+      return respond({ data: { status: 'active' } });
+    }
+
+    if (request.data?.error) {
+      return respond({ data: { acknowledged: true } });
+    }
+
+    const flowToken = request.flow_token || '';
+    const screen = request.screen;
+    const data = request.data || {};
+
+    if (request.action === 'INIT' || request.action === 'BACK') {
+      return respond({ screen: 'PERSONAL_DETAILS', data: {} });
+    }
+
+    if (screen === 'SET_TRANSACTION_PIN') {
+      return respond(await this.completeGetStarted(flowName, flowToken, data));
+    }
+
+    const nextScreen = ROUTING_MODEL[screen || ''];
+    if (nextScreen) {
+      return respond({ screen: nextScreen, data: {} });
+    }
+
+    return respond({ screen: 'PERSONAL_DETAILS', data: {} });
+  }
+
+  private async completeGetStarted(flowName: string, flowToken: string, data: Record<string, any>) {
+    const pin = String(data.pin || '');
+    const retypePin = String(data.retype_pin || '');
+
+    if (!/^\d{4}$/.test(pin) || pin !== retypePin) {
+      return {
+        screen: 'SET_TRANSACTION_PIN',
+        data: { error_message: 'PINs do not match. Please enter a 4-digit PIN and retype it correctly.' },
+      };
+    }
+
+    const waId = flowToken.replace(/^get_started_/, '');
+    const firstName = String(data.first_name || '');
+    const lastName = String(data.last_name || '');
+    const email = String(data.email || '');
+    const pinHash = await argon2.hash(pin);
+
+    const sessionData = {
+      firstName,
+      lastName,
+      idType: data.id_type,
+      idNumber: data.id_number,
+      email,
+      referralCode: data.referral_code,
+      street: data.street,
+      city: data.city,
+      state: data.state,
+      pinHash,
+    };
+
+    await this.prisma.whatsappFlowSession.upsert({
+      where: { flowToken },
+      create: { flowToken, waId, flowName, data: sessionData as any },
+      update: { waId, flowName, data: sessionData as any },
+    });
+
+    let user = await this.prisma.user.findUnique({ where: { phone: waId } });
+
+    if (user) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          firstName: firstName || user.firstName,
+          lastName: lastName || user.lastName,
+          email: email || user.email,
+        },
+      });
+    } else {
+      try {
+        user = await this.prisma.user.create({
+          data: {
+            phone: waId,
+            firstName: firstName || null,
+            lastName: lastName || null,
+            email: email || null,
+            status: 'PENDING' as any,
+          },
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2002' && email) {
+          user = await this.prisma.user.create({
+            data: {
+              phone: waId,
+              firstName: firstName || null,
+              lastName: lastName || null,
+              status: 'PENDING' as any,
+            },
+          });
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    await this.prisma.notification.create({
+      data: {
+        userId: user.id,
+        channel: 'WHATSAPP' as any,
+        template: 'flow_submission',
+        payload: {
+          flowToken,
+          waId,
+          flowName,
+          firstName,
+          lastName,
+          idType: data.id_type,
+          street: data.street,
+          city: data.city,
+          state: data.state,
+          pinConfigured: true,
+        } as any,
+        status: 'DELIVERED' as any,
+        sentAt: new Date(),
+      },
+    });
+
+    return {
+      screen: 'SUCCESS',
+      data: {
+        extension_message_response: {
+          params: {
+            flow_token: flowToken,
+            name: `${firstName} ${lastName}`.trim(),
+            phone: waId,
+          },
+        },
+      },
+    };
+  }
+
+  private plain(httpStatus: number, body: string): FlowEndpointResponse {
+    return { httpStatus, contentType: 'text/plain', body };
+  }
 
   async receiveWebhook(dto: WhatsappWebhookDto) {
     const stored = [];
@@ -60,61 +258,16 @@ export class WhatsappService {
   private async sendWelcomeReply(to: string, name?: string, phoneNumberId?: string) {
     const token = process.env.WHATSAPP_API_KEY;
     const numberId = phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const templateName = process.env.WHATSAPP_WELCOME_TEMPLATE || 'get_started_flow';
+    const flowId = process.env.WHATSAPP_FLOW_ID || undefined;
 
     if (!token || !numberId) return false;
 
-    const flowToken = randomUUID();
-    await this.prisma.whatsappFlowSession.create({
-      data: { flowToken, waId: to, flowName: 'get_started' },
-    });
+    const interactive = {
+      type: 'flow',
+      body: { text: welcomeTemplate(name || 'there') },
+      action: flowAction({ flowId, flowName: 'get_started' }, `get_started_${to}`),
+    };
 
-    const res = await fetch(`https://graph.facebook.com/v21.0/${numberId}/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to,
-        type: 'template',
-        template: {
-          name: templateName,
-          language: { code: 'en' },
-          components: [
-            {
-              type: 'body',
-              parameters: [{ type: 'text', text: name || 'there' }],
-            },
-            {
-              type: 'button',
-              sub_type: 'flow',
-              index: '0',
-              parameters: [
-                {
-                  type: 'flow',
-                  flow_name: 'get_started',
-                  flow_token: flowToken,
-                  flow_cta: 'Get Started',
-                },
-              ],
-            },
-          ],
-        },
-      }),
-    });
-
-    if (!res.ok) {
-      await this.prisma.whatsappFlowSession.delete({ where: { flowToken } }).catch(() => {});
-      return this.sendWelcomeFallback(to, name, numberId, token);
-    }
-
-    return true;
-  }
-
-  private async sendWelcomeFallback(to: string, name?: string, numberId?: string, token?: string) {
     const res = await fetch(`https://graph.facebook.com/v21.0/${numberId}/messages`, {
       method: 'POST',
       headers: {
@@ -126,49 +279,14 @@ export class WhatsappService {
         recipient_type: 'individual',
         to,
         type: 'interactive',
-        interactive: {
-          type: 'button',
-          body: { text: welcomeTemplate(name || 'there') },
-          action: { buttons: [WELCOME_BUTTON] },
-        },
+        interactive,
       }),
     });
 
     return res.ok;
   }
 
-  async handleFlowSubmission(flowName: string, body: Record<string, unknown>) {
-    const flowToken = (body.flow_token as string) || '';
-    const data = (body.data as Record<string, unknown>) || {};
-
-    const session = await this.prisma.whatsappFlowSession.findUnique({ where: { flowToken } });
-    if (!session) return { success: false, error: { message: 'Invalid or expired session' } };
-
-    const waId = session.waId;
-    const phone = waId.startsWith('+') ? waId : `+${waId}`;
-
-    try {
-      await this.authService.register({
-        phone,
-        email: (data.email as string) || undefined,
-        password: data.password as string,
-        firstName: data.firstName as string,
-        lastName: data.lastName as string,
-        country: data.country as string,
-      });
-
-      await this.prisma.whatsappFlowSession.delete({ where: { flowToken } });
-      return { success: true };
-    } catch (err: any) {
-      return {
-        success: false,
-        error: { message: err?.response?.message || 'Signup failed, please try again later' },
-      };
-    }
-  }
-
   async sendMessage(dto: SendWhatsappMessageDto) {
-    // In a real implementation, this would call the WhatsApp Business API
     // For now, store the outgoing message as a notification if the user exists
     const user = await this.prisma.user.findUnique({ where: { phone: dto.to } });
 
