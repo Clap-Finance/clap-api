@@ -1,3 +1,0 @@
--- AlterTable
-ALTER TABLE "WhatsappFlowSession" ADD COLUMN "data" JSONB;
-ALTER TABLE "WhatsappFlowSession" ADD COLUMN "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
